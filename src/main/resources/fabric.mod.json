@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
-  "id": "modid",
+  "id": "xiancraft",
   "version": "${version}",
 
-  "name": "Example Mod",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "name": "Xiancraft",
+  "description": "Aimed at providing an immersive way for player to seek for immortality in survival mode.",
   "authors": [
-    "Me!"
+    "Zergnewbee"
   ],
   "contact": {
-    "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "homepage": "",
+    "sources": "https://github.com/Xposeded/Xiancraft"
   },
 
-  "license": "CC0-1.0",
-  "icon": "assets/modid/icon.png",
+  "license": "All-Rights reserved",
+  "icon": "assets/xiancraft/icon.png",
 
   "environment": "*",
   "entrypoints": {
     "main": [
-      "net.fabricmc.example.ExampleMod"
+      "zergnewbee.xiancraft.example.ExampleMod"
     ]
   },
   "mixins": [
-    "modid.mixins.json"
+    "xiancraft.mixins.json"
   ],
 
   "depends": {
