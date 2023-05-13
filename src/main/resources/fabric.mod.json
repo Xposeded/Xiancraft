@@ -19,7 +19,10 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "zergnewbee.xiancraft.example.ExampleMod"
+      "zergnewbee.xiancraft.server.MainServerEntry"
+    ],
+    "client": [
+      "zergnewbee.xiancraft.client.MainClientEntry"
     ]
   },
   "mixins": [
