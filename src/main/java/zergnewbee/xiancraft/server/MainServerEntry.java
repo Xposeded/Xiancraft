@@ -1,12 +1,6 @@
 package zergnewbee.xiancraft.server;
 
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zergnewbee.xiancraft.server.block.BlockFactory;
@@ -20,6 +14,8 @@ public class MainServerEntry implements ModInitializer  {
     // That way, it's clear which mod wrote info, warnings, and errors.
     public static final Logger LOGGER = LoggerFactory.getLogger("xiancraft");
     public static final String ModID = "xiancraft";
+
+    public static final boolean shouldLog = true;
     @Override
     public void onInitialize() {
         // This code runs as soon as Minecraft is in a mod-load-ready state.
@@ -35,4 +31,5 @@ public class MainServerEntry implements ModInitializer  {
 
         LOGGER.info("Xiancraft serverside initialized successfully");
     }
+
 }

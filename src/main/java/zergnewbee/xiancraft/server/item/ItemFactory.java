@@ -28,6 +28,8 @@ public class ItemFactory {
             new Identifier(ModID,"test_group")).icon(()->new ItemStack(ADMIN_ITEM)).build();
 
     public static final BubbleCasterItem BUBBLE_CASTER_ITEM = new BubbleCasterItem(new Item.Settings().maxCount(16));
+    public static final ExampleItem EXAMPLE_ITEM = new ExampleItem(new FabricItemSettings().maxCount(16));
+
 
     public static final EntityType<CastingBubbleEntity> CASTING_BUBBLE_ENTITY = Registry.register(
             Registries.ENTITY_TYPE, new Identifier(ModID, "casting_bubble"),
@@ -40,8 +42,7 @@ public class ItemFactory {
         // Register  items in here
         register(ADMIN_ITEM,"admin_item");
         register(BUBBLE_CASTER_ITEM, "bubble_caster");
-        ExampleItem exampleItem = new ExampleItem(new FabricItemSettings().maxCount(16));
-        register(exampleItem,"example_item");
+        register(EXAMPLE_ITEM,"example_item");
 
     }
 
