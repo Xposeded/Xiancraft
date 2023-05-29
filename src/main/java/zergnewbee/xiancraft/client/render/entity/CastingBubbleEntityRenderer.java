@@ -13,7 +13,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
 import zergnewbee.xiancraft.client.render.entity.model.CastingBubbleEntityModel;
-import zergnewbee.xiancraft.server.block.entity.projectile.CastingBubbleEntity;
+import zergnewbee.xiancraft.server.entity.projectile.CastingBubbleEntity;
 
 public class CastingBubbleEntityRenderer extends EntityRenderer<CastingBubbleEntity> {
     private static final Identifier TEXTURE = new Identifier("textures/entity/shulker/spark.png");

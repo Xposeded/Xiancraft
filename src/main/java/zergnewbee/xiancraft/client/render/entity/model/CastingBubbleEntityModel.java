@@ -5,7 +5,7 @@ import net.minecraft.client.render.entity.model.SinglePartEntityModel;
 import net.minecraft.entity.Entity;
 
 public class CastingBubbleEntityModel<T extends Entity> extends SinglePartEntityModel<T> {
-    private static final String MAIN = "main";
+
     private final ModelPart root;
     private final ModelPart bullet;
 

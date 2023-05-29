@@ -1,0 +1,9 @@
+{
+    "hint.casting.uncharged" : "Core is not charged!",
+    "hint.casting.need_to_bind_core" :  "Need to bind a core!",
+    "hint.casting.check_core_position" :  "Check core position",
+    "hint.casting.confirmed" :  "Casting the spell of region [%s]",
+    "hint.casting.canceled" :  "Trying to cancel castings",
+    "item.xiancraft.bubble_caster" :  "Bubble Caster",
+    "block.xiancraft.xian_core_block" :  "Core Block"
+}

@@ -1,9 +1,10 @@
-package zergnewbee.xiancraft.server.block.entity.projectile;
+package zergnewbee.xiancraft.server.entity.projectile;
 
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.EndGatewayBlockEntity;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LightningEntity;
 import net.minecraft.entity.LivingEntity;
@@ -21,16 +22,16 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
-import zergnewbee.xiancraft.server.MainServerEntry;
+import zergnewbee.xiancraft.server.entity.CastingPortalEntity;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-import static zergnewbee.xiancraft.server.item.ItemFactory.CASTING_BUBBLE_ENTITY;
+import static zergnewbee.xiancraft.server.item.NonBlockRegisterFactory.CASTING_BUBBLE_ENTITY;
 
 public class CastingBubbleEntity extends ProjectileEntity {
 
-    private byte internalTick;
     private int abilitiesFlag;
     private BubbleStatus status;
 
@@ -38,30 +39,34 @@ public class CastingBubbleEntity extends ProjectileEntity {
 
     private static final TrackedData<Byte> AVAILABLE_POWER;
 
+    private static final TrackedData<Byte> INTERNAL_TICKS;
+    private static final TrackedData<Byte> STATUS_BYTE;
+
+
     private final List<BubbleStatus> directions = new ArrayList<>(4);
 
     public CastingBubbleEntity(EntityType<? extends ProjectileEntity> entityType, World world) {
         super(entityType, world);
 
-        internalTick = 0;
         abilitiesFlag = 0;
-        status =  BubbleStatus.PREPARING;
-
+        status = BubbleStatus.CASTING_UP;
         // The priority is set randomly once the bubble was created
         initRandomDirections();
 
         setPower((byte )48);
         setAvailablePower((byte) 0);
+        setInternalTicks((byte) 0);
+        setStatusByte(status);
     }
 
-    public CastingBubbleEntity(World world, double x, double y, double z){
+    public CastingBubbleEntity(World world, double x, double y, double z, Entity owner){
         this(CASTING_BUBBLE_ENTITY, world);
         this.setPosition(x, y, z);
+        setOwner(owner);
     }
 
     public CastingBubbleEntity(World world, LivingEntity owner){
-        this(world, owner.getX(), owner.getEyeY() - 0.10000000149011612, owner.getZ());
-        setOwner(owner);
+        this(world, owner.getX(), owner.getEyeY() - 0.10000000149011612, owner.getZ(), owner);
 
     }
 
@@ -80,6 +85,8 @@ public class CastingBubbleEntity extends ProjectileEntity {
     protected void initDataTracker() {
         this.dataTracker.startTracking(POWER, (byte)0);
         this.dataTracker.startTracking(AVAILABLE_POWER, (byte)0);
+        this.dataTracker.startTracking(INTERNAL_TICKS, (byte)0);
+        this.dataTracker.startTracking(STATUS_BYTE, (byte)0);
     }
 
     public byte getPower() {
@@ -98,14 +105,31 @@ public class CastingBubbleEntity extends ProjectileEntity {
         this.dataTracker.set(AVAILABLE_POWER, power);
     }
 
+    private byte getInternalTicks() {
+        return this.dataTracker.get(INTERNAL_TICKS);
+    }
+
+    private void setInternalTicks(byte ticks) {
+        this.dataTracker.set(INTERNAL_TICKS, ticks);
+    }
+
+    private BubbleStatus getStatusFromDataChecker() {
+        return convertToStatus(dataTracker.get(STATUS_BYTE));
+    }
+
+    private void setStatusByte(BubbleStatus status) {
+        this.dataTracker.set(STATUS_BYTE, (byte)status.ordinal());
+    }
+
     @Override
     protected void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
 
         setPower(nbt.getByte("Power"));
         setAvailablePower(nbt.getByte("APower"));
-        internalTick = nbt.getByte("ITicks");
-        status = convertToStatus(nbt.getByte("BStatus")) ;
+        setInternalTicks(nbt.getByte("ITicks"));
+        status = convertToStatus(nbt.getByte("BStatus"));
+        setStatusByte(status);
         abilitiesFlag = nbt.getInt("BAbilities");
 
     }
@@ -116,10 +140,11 @@ public class CastingBubbleEntity extends ProjectileEntity {
 
         nbt.putByte("Power", getPower());
         nbt.putByte("APower", getAvailablePower());
-        nbt.putByte("ITicks", internalTick);
+        nbt.putByte("ITicks", getInternalTicks());
         nbt.putByte("BStatus", (byte) status.ordinal());
         nbt.putInt("BAbilities", abilitiesFlag);
     }
+
 
     @Override
     public boolean doesRenderOnFire() {
@@ -131,41 +156,48 @@ public class CastingBubbleEntity extends ProjectileEntity {
         super.onCollision(hitResult);
         if (status == BubbleStatus.RELEASED) {
             LightningEntity lightningEntity = EntityType.LIGHTNING_BOLT.create(world);
-            if(lightningEntity != null){
+            if (lightningEntity != null){
                 lightningEntity.refreshPositionAfterTeleport(Vec3d.ofBottomCenter(this.getBlockPos()));
                 world.spawnEntity(lightningEntity);
             }
             this.kill();
-        } else if(status == BubbleStatus.PREPARING) {
+        } else if (status == BubbleStatus.PREPARING) {
+
             status = BubbleStatus.CASTING_UP;
             setVelocity(Vec3d.ZERO);
         }
     }
 
+
     @Override
     public void tick() {
         super.tick();
 
-        Vec3d velocity = this.getVelocity();
-        this.world.addParticle(ParticleTypes.END_ROD, this.getX() - velocity.x, this.getY() - velocity.y + 0.15, this.getZ() - velocity.z,
-                0.2*(Math.random()-0.5), 0.4*(Math.random()-0.5), 0.2*(Math.random()-0.5));
+        if (world.isClient) {
+            Vec3d velocity = this.getVelocity();
+            this.world.addParticle(ParticleTypes.END_ROD, this.getX() - velocity.x, this.getY() - velocity.y + 0.15, this.getZ() - velocity.z,
+                    0.2*(Math.random()-0.5), 0.4*(Math.random()-0.5), 0.2*(Math.random()-0.5));
+        }
 
+        status = getStatusFromDataChecker();
         switch (status) {
             case PREPARING -> normalMovement();
             case RELEASED -> releasedMovement();
             case CASTING_UP -> castingUpMovement();
             default -> castingHorizontalMovement();
         }
-
+        setStatusByte(status);
     }
 
     public boolean waitTicks(){
-        if(internalTick > 0){
-            internalTick--;
+        byte internalTicks = getInternalTicks();
+        if(internalTicks > 0){
+            internalTicks--;
+            setInternalTicks(internalTicks);
             return true;
         }
 
-        internalTick = 1;
+        setInternalTicks((byte) 1);
         return false;
     }
 
@@ -184,7 +216,7 @@ public class CastingBubbleEntity extends ProjectileEntity {
         boolean hasHitTarget = true;
         if (blockState.isOf(Blocks.AIR)) {
             // Move upward
-            setPosition(Vec3d.ofCenter(nextPos));
+            if(!world.isClient) setPosition(Vec3d.ofCenter(nextPos));
             movingEmitSound(blockState);
 
             // Will die if without enough power
@@ -196,22 +228,26 @@ public class CastingBubbleEntity extends ProjectileEntity {
             hasHitTarget = false;
         }
 
-        // Blocked by a block
+        // Blocked by a block from upward
         // Try to interact with the block that was hit
         if(hasHitTarget) xianReaction(blockState);
 
         boolean nowhereToGo = true;
         for (int i = 0; i < 4 ; i++) {
             // Fake random
-            BubbleStatus dir = directions.get( i + getPower() % 4);
-            switch (dir){
-                case CASTING_SOUTH ->  nextPos = nextPos.south();
-                case CASTING_WEST ->  nextPos = nextPos.west();
-                case CASTING_NORTH ->  nextPos = nextPos.north();
-                default -> nextPos = nextPos.east();
+            BubbleStatus dir = directions.get(i);
+            BlockPos nextPos2;
+            if (hasHitTarget) {
+                // Failed to move up
+                nextPos2 = curPos.offset(Direction.fromHorizontal(horizontalID(dir)));
             }
+            else{
+                // Moved up Successfully
+                nextPos2 = nextPos.offset(Direction.fromHorizontal(horizontalID(dir)));
+            }
+
             // Check whether the bubble can move forward
-            if (this.world.getBlockState(nextPos).isOf(Blocks.AIR)) {
+            if (this.world.getBlockState(nextPos2).isOf(Blocks.AIR)) {
 
                 // Move forward in next attempt
                 status = dir;
@@ -229,20 +265,22 @@ public class CastingBubbleEntity extends ProjectileEntity {
 
         if(waitTicks()) return;
 
+
         BlockPos curPos = BlockPos.ofFloored(getPos().x,getPos().y,getPos().z);
         BlockPos nextPos;
-        switch (status){
-            case CASTING_SOUTH ->  nextPos = curPos.south();
-            case CASTING_WEST ->  nextPos = curPos.west();
-            case CASTING_NORTH ->  nextPos = curPos.north();
-            default -> nextPos = curPos.east();
-        }
+        nextPos = curPos.offset(Direction.fromHorizontal(horizontalID(status)));
+
         BlockState blockState = this.world.getBlockState(nextPos);
+
+        // Record Path
+        if (getOwner() instanceof CastingPortalEntity portal){
+            portal.updatePathBits(curPos.getX(), curPos.getZ());
+        }
 
         // Check whether the bubble can move forward
         if (blockState.isOf(Blocks.AIR)) {
             // Move forward
-            setPosition(Vec3d.ofCenter(nextPos));
+            if(!world.isClient) setPosition(Vec3d.ofCenter(nextPos));
             movingEmitSound(blockState);
             // No more power
             if(!convertPower((byte) 1)){
@@ -259,39 +297,23 @@ public class CastingBubbleEntity extends ProjectileEntity {
 
         // Blocked, find another way
         for (int i = 0; i < 4 ; i++) {
-            // Fake random
-            BubbleStatus dir = directions.get( i + getPower() % 4);
+            // Choose a random direction
+            BubbleStatus dir = directions.get(i);
 
             // Don't move back
-            BubbleStatus oppositeDir;
-            switch (status){
-                case CASTING_UP ->  oppositeDir = BubbleStatus.CASTING_UP;
-                case CASTING_SOUTH ->  oppositeDir = BubbleStatus.CASTING_NORTH;
-                case CASTING_WEST ->  oppositeDir = BubbleStatus.CASTING_EAST;
-                case CASTING_NORTH ->  oppositeDir = BubbleStatus.CASTING_SOUTH;
-                default ->  oppositeDir = BubbleStatus.CASTING_WEST;
+            if (status != BubbleStatus.CASTING_UP) {
+                int oppositeID = Direction.fromHorizontal(horizontalID(status)).getOpposite().getHorizontal();
+                if (horizontalID(dir) == oppositeID) {
+                    continue;
+                }
             }
-            if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("[INFO_0] current i is : " + i);
-            if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("[INFO_1] current dir is : " + dir);
-            if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("[INFO_2] current status is : " + status);
-            if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("[INFO_3] current oppositeDir is :" + oppositeDir);
-            if(dir == oppositeDir){
-                if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("[INFO_3.5] current continued is :" + oppositeDir);
-                continue;
-            }
-            if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("[INFO_4] Possible searching i :" + i);
-            if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("[INFO_5] Possible searching dir :" + dir);
-            switch (dir){
-                case CASTING_SOUTH ->  nextPos = curPos.south();
-                case CASTING_WEST ->  nextPos = curPos.west();
-                case CASTING_NORTH ->  nextPos = curPos.north();
-                default -> nextPos = curPos.east();
-            }
+
+            nextPos = curPos.offset(Direction.fromHorizontal(horizontalID(dir)));
 
             // Check whether the bubble can move forward
             if (this.world.getBlockState(nextPos).isOf(Blocks.AIR)) {
                 // Move forward
-                setPosition(Vec3d.ofCenter(nextPos));
+                if(!world.isClient) setPosition(Vec3d.ofCenter(nextPos));
                 if(convertPower((byte) 1)){
                     status = dir;
                 }
@@ -300,7 +322,7 @@ public class CastingBubbleEntity extends ProjectileEntity {
             }
         }
 
-        if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("Blocked in horizontal directions, try to move up next");
+//        MainServerEntry.LOGGER.info("Blocked in horizontal directions, try to move up next");
         // Blocked in horizontal directions, try to move up next
         BlockPos nextPos3 = BlockPos.ofFloored(getPos().x,getPos().y,getPos().z).add(Direction.UP.getVector());
         BlockState blockState3 = this.world.getBlockState(nextPos3);
@@ -388,7 +410,7 @@ public class CastingBubbleEntity extends ProjectileEntity {
         }
         setPower(power);
         setAvailablePower(availablePower);
-        if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("Power + available power is " + (power+availablePower));
+
         return true;
     }
 
@@ -397,6 +419,10 @@ public class CastingBubbleEntity extends ProjectileEntity {
         if(lightningEntity != null){
             lightningEntity.refreshPositionAfterTeleport(Vec3d.ofBottomCenter(this.getBlockPos()));
             world.spawnEntity(lightningEntity);
+        }
+        Entity owner = getOwner();
+        if (owner instanceof CastingPortalEntity portal) {
+            portal.setPower((byte) 0);
         }
         this.kill();
     }
@@ -407,9 +433,7 @@ public class CastingBubbleEntity extends ProjectileEntity {
     }
 
     public void movingEmitSound(BlockState state){
-        float fraction = 0.5f * (float)getPower() / 48.0f;
-        if(MainServerEntry.shouldLog)MainServerEntry.LOGGER.info("Fraction is " + fraction);
-        playSound(SoundEvents.BLOCK_AMETHYST_BLOCK_STEP, 1.0f, 1.0f + fraction );
+        playSound(SoundEvents.BLOCK_AMETHYST_BLOCK_STEP, 1.0f, 1.0f );
     }
 
     public void initRandomDirections(){
@@ -418,13 +442,11 @@ public class CastingBubbleEntity extends ProjectileEntity {
          but this may cause Server-Client syncing problems
          which means they produce different random orders.
          */
-        directions.add(BubbleStatus.CASTING_EAST);
         directions.add(BubbleStatus.CASTING_SOUTH);
         directions.add(BubbleStatus.CASTING_WEST);
         directions.add(BubbleStatus.CASTING_NORTH);
         directions.add(BubbleStatus.CASTING_EAST);
-        directions.add(BubbleStatus.CASTING_SOUTH);
-        directions.add(BubbleStatus.CASTING_WEST);
+        Collections.shuffle(directions);
 
     }
 
@@ -439,23 +461,26 @@ public class CastingBubbleEntity extends ProjectileEntity {
     private BubbleStatus convertToStatus(byte status){
         return switch (status) {
             case 1 -> BubbleStatus.CASTING_UP;
-            case 2 -> BubbleStatus.CASTING_EAST;
-            case 3 -> BubbleStatus.CASTING_SOUTH;
-            case 4 -> BubbleStatus.CASTING_WEST;
-            case 5 -> BubbleStatus.CASTING_NORTH;
+            case 2 -> BubbleStatus.CASTING_SOUTH;
+            case 3 -> BubbleStatus.CASTING_WEST;
+            case 4 -> BubbleStatus.CASTING_NORTH;
+            case 5 -> BubbleStatus.CASTING_EAST;
             case 6 -> BubbleStatus.RELEASED;
             default -> BubbleStatus.PREPARING;
         };
     }
 
+    public int horizontalID(BubbleStatus status){
+        return  status.ordinal() - 2;
+    }
 
     enum BubbleStatus{
         PREPARING,
         CASTING_UP,
-        CASTING_EAST,
         CASTING_SOUTH,
         CASTING_WEST,
         CASTING_NORTH,
+        CASTING_EAST,
         RELEASED
     }
 
@@ -466,5 +491,7 @@ public class CastingBubbleEntity extends ProjectileEntity {
     static {
         POWER = DataTracker.registerData(CastingBubbleEntity.class, TrackedDataHandlerRegistry.BYTE);
         AVAILABLE_POWER = DataTracker.registerData(CastingBubbleEntity.class, TrackedDataHandlerRegistry.BYTE);
+        INTERNAL_TICKS = DataTracker.registerData(CastingBubbleEntity.class, TrackedDataHandlerRegistry.BYTE);
+        STATUS_BYTE = DataTracker.registerData(CastingBubbleEntity.class, TrackedDataHandlerRegistry.BYTE);
     }
 }

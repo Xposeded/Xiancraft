@@ -3,8 +3,8 @@ package zergnewbee.xiancraft.server;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import zergnewbee.xiancraft.server.block.BlockFactory;
-import zergnewbee.xiancraft.server.item.ItemFactory;
+import zergnewbee.xiancraft.server.block.BlockRegisterFactory;
+import zergnewbee.xiancraft.server.item.NonBlockRegisterFactory;
 
 
 public class MainServerEntry implements ModInitializer  {
@@ -12,7 +12,7 @@ public class MainServerEntry implements ModInitializer  {
     // This logger is used to write text to the console and the log file.
     // It is considered best practice to use your mod id as the logger's name.
     // That way, it's clear which mod wrote info, warnings, and errors.
-    public static final Logger LOGGER = LoggerFactory.getLogger("xiancraft");
+    public static final Logger LOGGER = LoggerFactory.getLogger("Xiancraft");
     public static final String ModID = "xiancraft";
 
     public static final boolean shouldLog = true;
@@ -26,8 +26,8 @@ public class MainServerEntry implements ModInitializer  {
 
         // Register blocks and items
 
-        ItemFactory.registerAll();
-        BlockFactory.registerAll();
+        NonBlockRegisterFactory.registerAll();
+        BlockRegisterFactory.registerAll();
 
         LOGGER.info("Xiancraft serverside initialized successfully");
     }

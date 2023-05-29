@@ -1,5 +1,8 @@
 {
   "variants": {
-    "": { "model": "xiancraft:block/xian_core_block" }
+    "facing=north": { "model": "xiancraft:block/xian_core_block", "uvlock": false },
+    "facing=east": { "model": "xiancraft:block/xian_core_block", "y":  90, "uvlock": false },
+    "facing=south": { "model": "xiancraft:block/xian_core_block", "y":  180, "uvlock": false },
+    "facing=west": { "model": "xiancraft:block/xian_core_block", "y":  270, "uvlock": false }
   }
 }

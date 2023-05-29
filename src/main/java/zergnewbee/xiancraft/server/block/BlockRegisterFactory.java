@@ -14,11 +14,15 @@ import net.minecraft.util.Identifier;
 import zergnewbee.xiancraft.server.block.entity.XianCoreBlockEntity;
 
 import static zergnewbee.xiancraft.server.MainServerEntry.ModID;
-import static zergnewbee.xiancraft.server.item.ItemFactory.ITEM_GROUP;
+import static zergnewbee.xiancraft.server.item.NonBlockRegisterFactory.ITEM_GROUP;
 
-public class BlockFactory {
+/**
+ * Register blocks, blockEntities and item group.
+ */
+public class BlockRegisterFactory {
 
-    public static final XianCoreBlock XIAN_CORE_BLOCK = new XianCoreBlock(FabricBlockSettings.of(Material.METAL).hardness(4.0f));
+    public static final XianCoreBlock XIAN_CORE_BLOCK = new XianCoreBlock(FabricBlockSettings.of(Material.METAL).
+            hardness(4.0f).nonOpaque().luminance(8));
     public static final BlockEntityType<XianCoreBlockEntity> XIAN_CORE_BLOCK_ENTITY = Registry.register(Registries.BLOCK_ENTITY_TYPE,
             new Identifier(ModID, "xian_core_block_entity"),
             FabricBlockEntityTypeBuilder.create(XianCoreBlockEntity::new, XIAN_CORE_BLOCK).build());
