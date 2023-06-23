@@ -1,3 +1,10 @@
 {
-
+  "item.xiancraft.bubble_caster.uncharged" : "未绑定任何核心!",
+  "item.xiancraft.bubble_caster.need_to_bind_core" :  "需要先进行核心绑定!",
+  "item.xiancraft.bubble_caster.bound" :  "成功绑定核心!",
+  "item.xiancraft.bubble_caster.check_core_position" :  "显示核心位置",
+  "item.xiancraft.bubble_caster.confirmed" :  "释放扇区为 [%d] 的法术",
+  "item.xiancraft.bubble_caster.canceled" :  "取消施法",
+  "item.xiancraft.bubble_caster" :  "施法媒介（临时）",
+  "block.xiancraft.xian_core_block" :  "核心方块"
 }

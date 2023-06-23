@@ -2,6 +2,7 @@ package zergnewbee.xiancraft.server.entity;
 
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
@@ -15,9 +16,11 @@ import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.property.Properties;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.*;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -39,6 +42,8 @@ public class CastingPortalEntity extends Entity implements Ownable {
     private Vec3i corePos;
 
     public boolean hasRendered;
+    public int clientCastingPos;
+    public int clientCastingPos2;
 
     public int[] pathBits = {0,0,0,0,0,0,0,0};
 
@@ -49,6 +54,7 @@ public class CastingPortalEntity extends Entity implements Ownable {
     private UUID ownerUuid;
     @Nullable
     private Entity owner;
+
 
     private static final TrackedData<Byte> POWER;
 
@@ -67,7 +73,7 @@ public class CastingPortalEntity extends Entity implements Ownable {
 
         setPower((byte) 100);
         vecUp = getRotationVector(getPitch() + 90, getYaw()).multiply(0.25);
-        setStatusByte(PortalStatus.SELECTING);
+        setStatusByte(PortalStatus.SELECTING_NONE);
     }
 
     public CastingPortalEntity(World world, LivingEntity owner){
@@ -158,6 +164,14 @@ public class CastingPortalEntity extends Entity implements Ownable {
             onPortalShuttingDown();
         }
 
+        // Particle render tick
+        if (!world.isClient) {
+            byte internalTicks = (byte) (getInternalTicks() + 1);
+            if (internalTicks > updateRenderTicks * 2) {
+                internalTicks = 0;
+            }
+            setInternalTicks(internalTicks);
+        }
 
         if (world.isClient) {
             world.addParticle(ParticleTypes.PORTAL, getPos().x, getPos().y - 0.15, getPos().z,
@@ -166,9 +180,9 @@ public class CastingPortalEntity extends Entity implements Ownable {
 
         status = getStatusFromDataChecker();
         switch (status) {
-            case SELECTING -> selecting();
+            case FINISHED -> casting();
             case CONVERTING -> converting();
-            default -> casting();
+            default -> selecting();
         }
         setStatusByte(status);
 
@@ -179,11 +193,22 @@ public class CastingPortalEntity extends Entity implements Ownable {
             Vec3d startPoint = owner.getEyePos();
             Vec3d endPoint = startPoint.add(vecForward.multiply(4));
             setPosition(endPoint);
+            // Update particle effect in client side
+            if(world.isClient) {
+                getCastingPos(owner, getPitch(), getYaw(), this);
+            }
         }
 
         byte power = getPower();
-        power--;
-        setPower(power);
+
+        if (!world.isClient) {
+            byte internalTicks = (byte) (getInternalTicks() + 1);
+            if (internalTicks > updateRenderTicks + updateRenderTicks / 4) {
+                power--;
+                setPower(power);
+            }
+        }
+
         if (power < 1) {
             playSound(SoundEvents.BLOCK_FIRE_EXTINGUISH, 1.0f, 1.0f);
             kill();
@@ -220,15 +245,6 @@ public class CastingPortalEntity extends Entity implements Ownable {
         if (getPower() < 50) {
             kill();
         }
-
-        if (!world.isClient) {
-            byte internalTicks = (byte) (getInternalTicks() + 1);
-            if (internalTicks > updateRenderTicks * 2) {
-                internalTicks = 0;
-            }
-            setInternalTicks(internalTicks);
-        }
-
 
         syncPositionsWithPlayer();
 
@@ -284,7 +300,7 @@ public class CastingPortalEntity extends Entity implements Ownable {
     }
 
     public void onConfirmCasting(PlayerEntity player, int castingPos, Vec3i corePosInput) {
-        if (owner != null && owner == player && getStatusFromDataChecker() == PortalStatus.SELECTING) {
+        if (owner != null && owner == player && getStatusFromDataChecker().ordinal() <= PortalStatus.SELECTING_EARTH.ordinal()) {
             corePos = corePosInput;
             BlockState blockState = world.getBlockState(new BlockPos(corePos));
 
@@ -306,36 +322,44 @@ public class CastingPortalEntity extends Entity implements Ownable {
         }
     }
 
-    public static int getCastingPos(Entity owner, float initPitch, float initYaw){
+    public static int getCastingPos(Entity owner, float initPitch, float initYaw, CastingPortalEntity portal) {
         float curYaw = MathHelper.wrapDegrees(owner.getYaw());
 
         float deltaYaw = MathHelper.subtractAngles(initYaw, curYaw);
         float deltaPitch = MathHelper.subtractAngles(initPitch, MathHelper.wrapDegrees(owner.getPitch()));
 
-        // Not recognizable movement
-        if(Math.abs(deltaPitch) < 3 && Math.abs(deltaYaw) < 3) return 0;
+        // Not recognizable movement (deltaAngle < 3°)
+        if (Math.abs(deltaPitch) < 3 && Math.abs(deltaYaw) < 3) {
+            if (portal != null ) {
+                portal.status = PortalStatus.SELECTING_NONE;
+                portal.clientCastingPos2 = 0;
+            }
+            return 0;
+        }
+        float upLength = MathHelper.sin(deltaPitch * 0.017453292F) / MathHelper.cos(deltaPitch * 0.017453292F);
+        float rightLength = MathHelper.sin(deltaYaw * 0.017453292F) / MathHelper.cos(deltaYaw * 0.017453292F);
 
-        boolean isMoreToPitch = Math.abs(deltaPitch) > Math.abs(deltaYaw);
-        if (deltaPitch >= 0) {
-            if (deltaYaw >= 0) {
-                if (isMoreToPitch) return 4;
-                else return 3;
-            }
-            else {
-                if (isMoreToPitch) return 5;
-                else return 6;
-            }
-        }
-        else {
-            if (deltaYaw >= 0) {
-                if (isMoreToPitch) return 1;
-                else  return 2;
-            }
-            else {
-                if (isMoreToPitch)  return 8;
-                else return 7;
+        double rotationDegrees = Math.toDegrees(Math.atan2(upLength, rightLength));
+        if (portal != null ) {
+            // Select a type when deltaAngle is ranged from 3° to 10°
+            if (Math.abs(deltaPitch) < 10 && Math.abs(deltaYaw) < 10) {
+                int ID2 = (((int) (rotationDegrees + 120.0 + 360) % 360) / 60) % 6 + 1;
+                portal.status = portal.convertToStatus((byte) ID2);
+                portal.clientCastingPos2 = ID2;
+
+
             }
         }
+
+        int ID = (((int) (rotationDegrees + 112.5 + 360) % 360) / 45) % 8 + 1;
+
+        if (portal != null )
+            portal.sendHint((PlayerEntity) portal.owner, "rotationDegrees[ "
+                + (rotationDegrees + 112.5 + 360) % 360
+                + " ]");
+
+        if (portal != null) portal.clientCastingPos = ID;
+        return ID;
     }
 
     public void updatePathBits(int x, int z) {
@@ -457,9 +481,15 @@ public class CastingPortalEntity extends Entity implements Ownable {
 
     private PortalStatus convertToStatus(byte status){
         return switch (status) {
-            case 1 -> PortalStatus.CONVERTING;
-            case 2 -> PortalStatus.FINISHED;
-            default -> PortalStatus.SELECTING;
+            case 1 -> PortalStatus.SELECTING_ALL;
+            case 2 -> PortalStatus.SELECTING_METAL;
+            case 3 -> PortalStatus.SELECTING_WOOD;
+            case 4 -> PortalStatus.SELECTING_WATER;
+            case 5 -> PortalStatus.SELECTING_FIRE;
+            case 6 -> PortalStatus.SELECTING_EARTH;
+            case 7 -> PortalStatus.CONVERTING;
+            case 8 -> PortalStatus.FINISHED;
+            default -> PortalStatus.SELECTING_NONE;
         };
     }
 
@@ -471,8 +501,22 @@ public class CastingPortalEntity extends Entity implements Ownable {
 
 
     public enum PortalStatus{
-        SELECTING,
+        SELECTING_NONE,
+        SELECTING_ALL,
+        SELECTING_METAL,
+        SELECTING_WOOD,
+        SELECTING_WATER,
+        SELECTING_FIRE,
+        SELECTING_EARTH,
         CONVERTING,
         FINISHED
+    }
+
+    private void sendHint(PlayerEntity playerEntity, String str) {
+        if (playerEntity instanceof ClientPlayerEntity clientPlayerEntity) {
+            Text text;
+            text = Text.of(str);
+            clientPlayerEntity.sendMessage(text, true);
+        }
     }
 }

@@ -37,8 +37,6 @@ public class CastingBubbleEntity extends ProjectileEntity {
 
     private static final TrackedData<Byte> POWER;
 
-    private static final TrackedData<Byte> AVAILABLE_POWER;
-
     private static final TrackedData<Byte> INTERNAL_TICKS;
     private static final TrackedData<Byte> STATUS_BYTE;
 
@@ -54,7 +52,6 @@ public class CastingBubbleEntity extends ProjectileEntity {
         initRandomDirections();
 
         setPower((byte )48);
-        setAvailablePower((byte) 0);
         setInternalTicks((byte) 0);
         setStatusByte(status);
     }
@@ -84,7 +81,6 @@ public class CastingBubbleEntity extends ProjectileEntity {
     @Override
     protected void initDataTracker() {
         this.dataTracker.startTracking(POWER, (byte)0);
-        this.dataTracker.startTracking(AVAILABLE_POWER, (byte)0);
         this.dataTracker.startTracking(INTERNAL_TICKS, (byte)0);
         this.dataTracker.startTracking(STATUS_BYTE, (byte)0);
     }
@@ -95,14 +91,6 @@ public class CastingBubbleEntity extends ProjectileEntity {
 
     private void setPower(byte power) {
         this.dataTracker.set(POWER, power);
-    }
-
-    public byte getAvailablePower() {
-        return this.dataTracker.get(AVAILABLE_POWER);
-    }
-
-    private void setAvailablePower(byte power) {
-        this.dataTracker.set(AVAILABLE_POWER, power);
     }
 
     private byte getInternalTicks() {
@@ -126,7 +114,6 @@ public class CastingBubbleEntity extends ProjectileEntity {
         super.readCustomDataFromNbt(nbt);
 
         setPower(nbt.getByte("Power"));
-        setAvailablePower(nbt.getByte("APower"));
         setInternalTicks(nbt.getByte("ITicks"));
         status = convertToStatus(nbt.getByte("BStatus"));
         setStatusByte(status);
@@ -139,7 +126,6 @@ public class CastingBubbleEntity extends ProjectileEntity {
         super.writeCustomDataToNbt(nbt);
 
         nbt.putByte("Power", getPower());
-        nbt.putByte("APower", getAvailablePower());
         nbt.putByte("ITicks", getInternalTicks());
         nbt.putByte("BStatus", (byte) status.ordinal());
         nbt.putInt("BAbilities", abilitiesFlag);
@@ -172,6 +158,11 @@ public class CastingBubbleEntity extends ProjectileEntity {
     @Override
     public void tick() {
         super.tick();
+
+        if (!world.isClient) {
+            // Dies if not linked to any portal
+            if (getOwner() == null || ! (getOwner() instanceof CastingPortalEntity)) kill();
+        }
 
         if (world.isClient) {
             Vec3d velocity = this.getVelocity();
@@ -392,34 +383,34 @@ public class CastingBubbleEntity extends ProjectileEntity {
     }
 
     public boolean convertPower(byte amount){
-        byte power = getPower();
-        byte availablePower = getAvailablePower();
-        if(power + availablePower < amount) {
-            accident(0);
-            return false;
-        }
+        Entity owner = getOwner();
+        if (owner instanceof CastingPortalEntity portal) {
+            byte power = getPower();
+            byte availablePower = portal.getPower();
+            if (power + availablePower < amount) {
+                accident(0);
+                return false;
+            }
 
-        if(getPower()  >= amount) {
-            power -= amount;
-            availablePower += amount;
-        }
-        else{
-            availablePower += power ;
-            availablePower -= amount - power ;
-            power = 0;
-        }
-        setPower(power);
-        setAvailablePower(availablePower);
+            if (availablePower >= amount) {
+                power += amount;
+                availablePower -= amount;
+            } else {
+                power += availablePower;
+                power -= amount - availablePower;
+                availablePower = 0;
+            }
+            setPower(power);
+            portal.setPower(availablePower);
 
-        return true;
+            return true;
+        }
+        return false;
     }
 
     public void accident( int level ){
-        LightningEntity lightningEntity = EntityType.LIGHTNING_BOLT.create(world);
-        if(lightningEntity != null){
-            lightningEntity.refreshPositionAfterTeleport(Vec3d.ofBottomCenter(this.getBlockPos()));
-            world.spawnEntity(lightningEntity);
-        }
+        this.world.createExplosion(this, this.getX(), this.getBodyY(0.0625), this.getZ(), 0.01F, World.ExplosionSourceType.MOB);
+
         Entity owner = getOwner();
         if (owner instanceof CastingPortalEntity portal) {
             portal.setPower((byte) 0);
@@ -490,7 +481,6 @@ public class CastingBubbleEntity extends ProjectileEntity {
 
     static {
         POWER = DataTracker.registerData(CastingBubbleEntity.class, TrackedDataHandlerRegistry.BYTE);
-        AVAILABLE_POWER = DataTracker.registerData(CastingBubbleEntity.class, TrackedDataHandlerRegistry.BYTE);
         INTERNAL_TICKS = DataTracker.registerData(CastingBubbleEntity.class, TrackedDataHandlerRegistry.BYTE);
         STATUS_BYTE = DataTracker.registerData(CastingBubbleEntity.class, TrackedDataHandlerRegistry.BYTE);
     }

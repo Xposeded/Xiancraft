@@ -13,6 +13,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.stat.Stats;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -62,13 +63,13 @@ public class BubbleCasterItem extends Item {
                 float initPitch = nbtCompound.getFloat("InitPitch");
                 float initYaw = nbtCompound.getFloat("InitYaw");
 
-                int castingPos = CastingPortalEntity.getCastingPos(user, initPitch, initYaw);
+                int castingPos = CastingPortalEntity.getCastingPos(user, initPitch, initYaw, null);
 
 
-                String string;
-                if (castingPos != 0) string = String.valueOf( Text.translatable("hint.casting.confirmed", castingPos) );
-                else string = String.valueOf(Text.translatable("hint.casting.canceled"));
-                sendHint(playerEntity, string);
+                MutableText text;
+                if (castingPos != 0) text = Text.translatable("item.xiancraft.bubble_caster.confirmed", castingPos);
+                else text = Text.translatable("item.xiancraft.bubble_caster.canceled");
+                sendHint(playerEntity, text);
 
 
                 if (castingPos == 0) {
@@ -87,7 +88,7 @@ public class BubbleCasterItem extends Item {
 
         ItemStack itemStack = user.getStackInHand(hand);
         if (user.isSneaking()) {
-            sendHint(user, String.valueOf(Text.translatable("hint.casting.check_core_position")));
+            sendHint(user, Text.translatable("item.xiancraft.bubble_caster.check_core_position"));
             if(checkXianCore(world, user, itemStack))
                 return TypedActionResult.success(itemStack, true);
         } else {
@@ -128,7 +129,7 @@ public class BubbleCasterItem extends Item {
             NbtCompound nbtCompound = itemStack.getNbt();
             if (nbtCompound != null) {
                 nbtCompound.putIntArray("CorePos", new int[]{blockPos.getX(), blockPos.getY(), blockPos.getZ()});
-                sendHint(player, "已成功绑定核心方块");
+                sendHint(player, Text.translatable("item.xiancraft.bubble_caster.bound"));
                 return true;
             }
 
@@ -145,7 +146,7 @@ public class BubbleCasterItem extends Item {
                 // Can cast only when the core is charged
                 if (blockState.isOf(XIAN_CORE_BLOCK) ) {
                     if (!blockState.get(XianCoreBlock.CHARGED)) {
-                        sendHint(player, String.valueOf(Text.translatable("hint.casting.uncharged")));
+                        sendHint(player, Text.translatable("item.xiancraft.bubble_caster.uncharged"));
                         return false;
                     }
                     if (world.isClient()) {
@@ -157,7 +158,7 @@ public class BubbleCasterItem extends Item {
                 }
             }
         }
-        sendHint(player, String.valueOf(Text.translatable("hint.casting.need_to_bind_core")));
+        sendHint(player, Text.translatable("item.xiancraft.bubble_caster.need_to_bind_core"));
 
         return false;
     }
@@ -230,13 +231,11 @@ public class BubbleCasterItem extends Item {
     }
 
     public int getMaxUseTime(ItemStack stack) {
-        return 98;
+        return 1198;
     }
 
-    private void sendHint(PlayerEntity playerEntity, String str) {
+    private void sendHint(PlayerEntity playerEntity, MutableText text) {
         if (playerEntity instanceof ServerPlayerEntity serverPlayerEntity) {
-            Text text;
-            text = Text.of(str);
             serverPlayerEntity.sendMessage(text, true);
         }
     }
